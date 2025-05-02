@@ -1,0 +1,2886 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Vitals Metrics Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #64B5F6;
+      --primary-light: #90CAF9;
+      --primary-dark: #1E88E5;
+      --accent-color: #FF7043;
+      --good-color: #66BB6A;
+      --needs-improvement-color: #FFA726;
+      --poor-color: #EF5350;
+      --text-color: #E0E0E0;
+      --text-light: #BDBDBD;
+      --text-dark: #FFFFFF;
+      --background-color: #121212;
+      --card-color: #1E1E1E;
+      --card-hover: #2A2A2A;
+      --border-color: #333333;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      --sidebar-width: 280px;
+      --chart-grid-color: rgba(255, 255, 255, 0.08);
+      --legend-text: #FFFFFF;
+      --legend-title: #90CAF9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      color: var(--text-color);
+      background-color: var(--background-color);
+      line-height: 1.6;
+    }
+
+    /* Sidebar styles */
+    .sidebar {
+      width: var(--sidebar-width);
+      height: 100vh;
+      overflow-y: auto;
+      position: fixed;
+      background-color: var(--card-color);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      z-index: 10;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+      color: var(--primary-light);
+      padding-bottom: 15px;
+      border-bottom: 2px solid var(--primary-dark);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    .sidebar ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      margin-bottom: 10px;
+      padding: 2px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar a {
+      text-decoration: none;
+      color: var(--primary-light);
+      display: inline-block;
+      word-break: break-all;
+      line-height: 1.4;
+      padding: 5px 0;
+      transition: color 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text-dark);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    /* Main content styles */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      padding: 30px;
+      width: calc(100% - var(--sidebar-width));
+      box-sizing: border-box;
+    }
+
+    h1,
+    h2,
+    h3 {
+      color: var(--text-dark);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 500;
+      border-bottom: 3px solid var(--primary-color);
+      padding-bottom: 10px;
+      display: inline-block;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--primary-light);
+    }
+
+    .origin-section {
+      margin-bottom: 40px;
+      padding: 25px;
+      border-radius: 8px;
+      background-color: var(--card-color);
+      box-shadow: var(--shadow);
+      border-top: 4px solid var(--primary-color);
+    }
+
+    .metric-row {
+      display: flex;
+      margin-bottom: 30px;
+      gap: 25px;
+    }
+
+    .chart-container {
+      flex: 1;
+      background-color: var(--card-color);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+    }
+
+    .chart-container:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+      background-color: var(--card-hover);
+    }
+
+    .canvas-wrapper,
+    .p75-canvas-wrapper {
+      height: 300px;
+      position: relative;
+      margin-top: 15px;
+    }
+
+    /* Updated legend styles for better visibility */
+    .legend {
+      display: flex;
+      margin: 20px 0 30px;
+      flex-wrap: wrap;
+      background-color: rgba(40, 40, 40, 0.9);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--primary-color);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-right: 30px;
+      margin-bottom: 10px;
+    }
+
+    .legend-item span {
+      font-weight: 500;
+      font-size: 15px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Add !important to ensure our colors override any default styles */
+    .legend-item.good span {
+      color: #66BB6A !important;
+    }
+
+    .legend-item.needs-improvement span {
+      color: #FFA726 !important;
+    }
+
+    .legend-item.poor span {
+      color: #EF5350 !important;
+    }
+
+    .legend-item.ag-script span {
+      color: #FF7043 !important;
+    }
+
+    .legend-color {
+      width: 22px;
+      height: 22px;
+      margin-right: 10px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .middle-month-legend {
+      margin-left: 20px;
+    }
+
+    .middle-month-legend .legend-color {
+      border-radius: 50%;
+    }
+
+    .middle-month-note {
+      font-style: italic;
+      margin-top: 5px;
+      margin-bottom: 30px;
+      font-size: 0.9em;
+      color: var(--text-light);
+      background-color: rgba(33, 150, 243, 0.1);
+      padding: 12px 20px;
+      border-radius: 6px;
+      border-left: 4px solid var(--primary-color);
+    }
+
+    /* Responsive styles */
+    @media (max-width: 1200px) {
+      .metric-row {
+        flex-direction: column;
+      }
+
+      .chart-container {
+        margin-bottom: 20px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 15px;
+      }
+
+      .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+      }
+
+      .origin-section {
+        padding: 15px;
+      }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--card-color);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--primary-dark);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--primary-color);
+    }
+
+    /* Add canvas background styling */
+    .canvas-wrapper canvas,
+    .p75-canvas-wrapper canvas {
+      background-color: var(--card-color);
+      border-radius: 4px;
+    }
+
+    /* Add specific styling for Chart.js legends */
+    .chart-js-legend {
+      color: var(--text-color) !important;
+    }
+
+    /* Force Chart.js text to use our colors */
+    canvas {
+      --chart-text-color: #FFFFFF;
+    }
+
+    /* Force legend text colors */
+    .legend-item.good span {
+      color: #66BB6A !important;
+    }
+
+    .legend-item.needs-improvement span {
+      color: #FFA726 !important;
+    }
+
+    .legend-item.poor span {
+      color: #EF5350 !important;
+    }
+
+    .legend-item.ag-script span {
+      color: #FF7043 !important;
+    }
+
+    /* Force Chart.js legend colors */
+    .chartjs-legend-item-text {
+      color: inherit !important;
+    }
+
+    /* Add styling for the performance indicator */
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+
+    .chart-header h3 {
+      margin-bottom: 0;
+    }
+
+    .performance-indicator {
+      font-size: 12px;
+      color: #BDBDBD;
+      font-style: italic;
+      margin-left: 10px;
+    }
+
+    /* Add an arrow icon for visual emphasis */
+    .performance-indicator::before {
+      content: "↓ ";
+      color: #66BB6A;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sidebar">
+    <h2>Origins</h2>
+    <ul>
+      <li><a href="#https___www_bmwofcollegestation_com">https://www.bmwofcollegestation.com</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <h1>Web Vitals Metrics Dashboard</h1>
+
+    <div id="https___www_bmwofcollegestation_com" class="origin-section">
+      <h2>https://www.bmwofcollegestation.com</h2>
+
+      <div class="metric-row">
+        <div class="chart-container">
+          <h3>Largest Contentful Paint (LCP)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__dist"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>LCP 75th Percentile (ms) Trend</h3>
+            <span class="performance-indicator">Lower values indicate better performance</span>
+          </div>
+          <div class="p75-canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="chart-container">
+          <h3>Cumulative Layout Shift (CLS)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__dist"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>CLS 75th Percentile Trend</h3>
+            <span class="performance-indicator">Lower values indicate better performance</span>
+          </div>
+          <div class="p75-canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="chart-container">
+          <h3>Interaction to Next Paint (INP)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__dist"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>INP 75th Percentile (ms) Trend</h3>
+            <span class="performance-indicator">Lower values indicate better performance</span>
+          </div>
+          <div class="p75-canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="chart-container">
+          <h3>Time to First Byte (TTFB)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__dist"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>TTFB 75th Percentile (ms) Trend</h3>
+            <span class="performance-indicator">Lower values indicate better performance</span>
+          </div>
+          <div class="p75-canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="chart-container">
+          <h3>First Contentful Paint (FCP)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__dist"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>FCP 75th Percentile (ms) Trend</h3>
+            <span class="performance-indicator">Lower values indicate better performance</span>
+          </div>
+          <div class="p75-canvas-wrapper">
+            <canvas id="https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const charts = {};
+
+      // Override Chart.js defaults with our dark theme colors
+      Chart.defaults.color = '#FFFFFF';
+      Chart.defaults.font.family = "'Roboto', sans-serif";
+      Chart.defaults.font.weight = '500';
+
+      // Override the legend plugin defaults
+      Chart.defaults.plugins.legend.labels.color = '#FFFFFF';
+      Chart.defaults.plugins.legend.labels.font = {
+        weight: '500',
+        size: 13
+      };
+
+      // Create a plugin to force legend colors
+      const forceLegendColors = {
+        id: 'forceLegendColors',
+        beforeDraw: (chart) => {
+          const legendItems = chart.legend.legendItems;
+          if (legendItems) {
+            legendItems.forEach(item => {
+              if (item.text === 'Good') {
+                item.fontColor = '#66BB6A';
+              } else if (item.text === 'Needs Improvement') {
+                item.fontColor = '#FFA726';
+              } else if (item.text === 'Poor') {
+                item.fontColor = '#EF5350';
+              } else if (item.text.includes('75th Percentile')) {
+                item.fontColor = '#64B5F6';
+              }
+            });
+          }
+        }
+      };
+
+      function createAllCharts() {
+        try {
+
+          // Data for https://www.bmwofcollegestation.com
+          const https___www_bmwofcollegestation_comData = [{ "month": "Jan 2022", "yyyymm": "202201", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7263", "avg_lcp": "0.1718", "slow_lcp": "0.1022", "p75_lcp": "2600", "small_cls": "0.3606", "medium_cls": "0.1636", "large_cls": "0.476", "p75_cls": "0.45", "fast_inp": null, "avg_inp": null, "slow_inp": null, "p75_inp": null, "fast_ttfb": "0.7423", "avg_ttfb": "0.2238", "slow_ttfb": "0.034", "p75_ttfb": "800", "fast_fcp": "0.8634", "avg_fcp": "0.0964", "slow_fcp": "0.0407", "p75_fcp": "1400" }, { "month": "Feb 2022", "yyyymm": "202202", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7112", "avg_lcp": "0.1759", "slow_lcp": "0.1127", "p75_lcp": "2600", "small_cls": "0.3902", "medium_cls": "0.199", "large_cls": "0.411", "p75_cls": "0.4", "fast_inp": "0.7434", "avg_inp": "0.1227", "slow_inp": "0.134", "p75_inp": "100", "fast_ttfb": "0.7316", "avg_ttfb": "0.2134", "slow_ttfb": "0.0551", "p75_ttfb": "800", "fast_fcp": "0.8409", "avg_fcp": "0.1081", "slow_fcp": "0.0513", "p75_fcp": "1400" }, { "month": "Mar 2022", "yyyymm": "202203", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.75", "avg_lcp": "0.1573", "slow_lcp": "0.0927", "p75_lcp": "2400", "small_cls": "0.4307", "medium_cls": "0.1874", "large_cls": "0.3819", "p75_cls": "0.35", "fast_inp": "0.8038", "avg_inp": "0.1251", "slow_inp": "0.0712", "p75_inp": "50", "fast_ttfb": "0.7318", "avg_ttfb": "0.229", "slow_ttfb": "0.0392", "p75_ttfb": "800", "fast_fcp": "0.8689", "avg_fcp": "0.0967", "slow_fcp": "0.0344", "p75_fcp": "1300" }, { "month": "Apr 2022", "yyyymm": "202204", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7099", "avg_lcp": "0.2053", "slow_lcp": "0.0844", "p75_lcp": "2600", "small_cls": "0.418", "medium_cls": "0.1501", "large_cls": "0.4318", "p75_cls": "0.4", "fast_inp": "0.7384", "avg_inp": "0.1703", "slow_inp": "0.0916", "p75_inp": "200", "fast_ttfb": "0.7481", "avg_ttfb": "0.2323", "slow_ttfb": "0.0193", "p75_ttfb": "800", "fast_fcp": "0.8979", "avg_fcp": "0.0783", "slow_fcp": "0.0234", "p75_fcp": "1200" }, { "month": "May 2022", "yyyymm": "202205", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7287", "avg_lcp": "0.1928", "slow_lcp": "0.0779", "p75_lcp": "2600", "small_cls": "0.464", "medium_cls": "0.1556", "large_cls": "0.3805", "p75_cls": "0.35", "fast_inp": "0.6734", "avg_inp": "0.1371", "slow_inp": "0.1898", "p75_inp": "250", "fast_ttfb": "0.7781", "avg_ttfb": "0.2016", "slow_ttfb": "0.0202", "p75_ttfb": "700", "fast_fcp": "0.9052", "avg_fcp": "0.0723", "slow_fcp": "0.0223", "p75_fcp": "1200" }, { "month": "Jun 2022", "yyyymm": "202206", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5652", "avg_lcp": "0.2504", "slow_lcp": "0.1845", "p75_lcp": "3400", "small_cls": "0.2265", "medium_cls": "0.1879", "large_cls": "0.5855", "p75_cls": "0.55", "fast_inp": "0.6078", "avg_inp": "0.1751", "slow_inp": "0.2177", "p75_inp": "350", "fast_ttfb": "0.7313", "avg_ttfb": "0.2393", "slow_ttfb": "0.0296", "p75_ttfb": "800", "fast_fcp": "0.8773", "avg_fcp": "0.0831", "slow_fcp": "0.0402", "p75_fcp": "1300" }, { "month": "Jul 2022", "yyyymm": "202207", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6167", "avg_lcp": "0.2125", "slow_lcp": "0.171", "p75_lcp": "3200", "small_cls": "0.2347", "medium_cls": "0.1833", "large_cls": "0.582", "p75_cls": "0.55", "fast_inp": "0.6804", "avg_inp": "0.1349", "slow_inp": "0.185", "p75_inp": "250", "fast_ttfb": "0.7807", "avg_ttfb": "0.1913", "slow_ttfb": "0.0285", "p75_ttfb": "700", "fast_fcp": "0.8893", "avg_fcp": "0.0829", "slow_fcp": "0.0282", "p75_fcp": "1200" }, { "month": "Aug 2022", "yyyymm": "202208", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6017", "avg_lcp": "0.2151", "slow_lcp": "0.183", "p75_lcp": "3400", "small_cls": "0.2254", "medium_cls": "0.2202", "large_cls": "0.5545", "p75_cls": "0.5", "fast_inp": "0.6606", "avg_inp": "0.1635", "slow_inp": "0.1761", "p75_inp": "300", "fast_ttfb": "0.7238", "avg_ttfb": "0.2427", "slow_ttfb": "0.0335", "p75_ttfb": "800", "fast_fcp": "0.8817", "avg_fcp": "0.0845", "slow_fcp": "0.0341", "p75_fcp": "1300" }, { "month": "Sep 2022", "yyyymm": "202209", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.648", "avg_lcp": "0.1831", "slow_lcp": "0.1691", "p75_lcp": "3100", "small_cls": "0.2724", "medium_cls": "0.2017", "large_cls": "0.526", "p75_cls": "0.5", "fast_inp": "0.6626", "avg_inp": "0.1609", "slow_inp": "0.1766", "p75_inp": "275", "fast_ttfb": "0.6924", "avg_ttfb": "0.2689", "slow_ttfb": "0.0383", "p75_ttfb": "800", "fast_fcp": "0.8764", "avg_fcp": "0.0799", "slow_fcp": "0.0434", "p75_fcp": "1300" }, { "month": "Oct 2022", "yyyymm": "202210", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5933", "avg_lcp": "0.2356", "slow_lcp": "0.1711", "p75_lcp": "3300", "small_cls": "0.2987", "medium_cls": "0.1975", "large_cls": "0.5036", "p75_cls": "0.5", "fast_inp": "0.6473", "avg_inp": "0.1814", "slow_inp": "0.171", "p75_inp": "275", "fast_ttfb": "0.7066", "avg_ttfb": "0.257", "slow_ttfb": "0.0361", "p75_ttfb": "800", "fast_fcp": "0.8764", "avg_fcp": "0.0927", "slow_fcp": "0.0305", "p75_fcp": "1300" }, { "month": "Nov 2022", "yyyymm": "202211", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6623", "avg_lcp": "0.2055", "slow_lcp": "0.132", "p75_lcp": "2900", "small_cls": "0.338", "medium_cls": "0.1571", "large_cls": "0.5049", "p75_cls": "0.45", "fast_inp": "0.6865", "avg_inp": "0.1595", "slow_inp": "0.1538", "p75_inp": "250", "fast_ttfb": "0.7508", "avg_ttfb": "0.2153", "slow_ttfb": "0.0342", "p75_ttfb": "700", "fast_fcp": "0.869", "avg_fcp": "0.091", "slow_fcp": "0.0405", "p75_fcp": "1300" }, { "month": "Dec 2022", "yyyymm": "202212", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7097", "avg_lcp": "0.163", "slow_lcp": "0.1275", "p75_lcp": "2700", "small_cls": "0.2862", "medium_cls": "0.2011", "large_cls": "0.5126", "p75_cls": "0.45", "fast_inp": "0.6704", "avg_inp": "0.1635", "slow_inp": "0.166", "p75_inp": "275", "fast_ttfb": "0.75", "avg_ttfb": "0.2264", "slow_ttfb": "0.024", "p75_ttfb": "800", "fast_fcp": "0.8865", "avg_fcp": "0.0775", "slow_fcp": "0.036", "p75_fcp": "1300" }, { "month": "Jan 2023", "yyyymm": "202301", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7578", "avg_lcp": "0.1351", "slow_lcp": "0.1061", "p75_lcp": "2400", "small_cls": "0.2972", "medium_cls": "0.173", "large_cls": "0.5298", "p75_cls": "0.5", "fast_inp": "0.7085", "avg_inp": "0.1396", "slow_inp": "0.1514", "p75_inp": "225", "fast_ttfb": "0.7084", "avg_ttfb": "0.2536", "slow_ttfb": "0.0376", "p75_ttfb": "800", "fast_fcp": "0.8846", "avg_fcp": "0.0782", "slow_fcp": "0.037", "p75_fcp": "1300" }, { "month": "Feb 2023", "yyyymm": "202302", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.707", "avg_lcp": "0.1639", "slow_lcp": "0.1288", "p75_lcp": "2700", "small_cls": "0.4347", "medium_cls": "0.1414", "large_cls": "0.424", "p75_cls": "0.4", "fast_inp": "0.656", "avg_inp": "0.1773", "slow_inp": "0.1668", "p75_inp": "275", "fast_ttfb": "0.6428", "avg_ttfb": "0.3029", "slow_ttfb": "0.0542", "p75_ttfb": "900", "fast_fcp": "0.8399", "avg_fcp": "0.1086", "slow_fcp": "0.051", "p75_fcp": "1400" }, { "month": "Mar 2023", "yyyymm": "202303", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.7099", "avg_lcp": "0.156", "slow_lcp": "0.134", "p75_lcp": "2700", "small_cls": "0.4483", "medium_cls": "0.1582", "large_cls": "0.3936", "p75_cls": "0.4", "fast_inp": "0.6832", "avg_inp": "0.1587", "slow_inp": "0.1581", "p75_inp": "250", "fast_ttfb": "0.6294", "avg_ttfb": "0.3166", "slow_ttfb": "0.0547", "p75_ttfb": "900", "fast_fcp": "0.8267", "avg_fcp": "0.1216", "slow_fcp": "0.0523", "p75_fcp": "1500" }, { "month": "Apr 2023", "yyyymm": "202304", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5618", "avg_lcp": "0.2208", "slow_lcp": "0.2177", "p75_lcp": "3600", "small_cls": "0.4246", "medium_cls": "0.1638", "large_cls": "0.4116", "p75_cls": "0.4", "fast_inp": "0.7178", "avg_inp": "0.1504", "slow_inp": "0.1317", "p75_inp": "200", "fast_ttfb": "0.2985", "avg_ttfb": "0.4881", "slow_ttfb": "0.2128", "p75_ttfb": "1600", "fast_fcp": "0.6349", "avg_fcp": "0.2161", "slow_fcp": "0.1483", "p75_fcp": "2200" }, { "month": "May 2023", "yyyymm": "202305", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6904", "avg_lcp": "0.1779", "slow_lcp": "0.1315", "p75_lcp": "2800", "small_cls": "0.4036", "medium_cls": "0.17", "large_cls": "0.4266", "p75_cls": "0.4", "fast_inp": "0.7369", "avg_inp": "0.1496", "slow_inp": "0.113", "p75_inp": "200", "fast_ttfb": "0.538", "avg_ttfb": "0.3939", "slow_ttfb": "0.0681", "p75_ttfb": "1000", "fast_fcp": "0.8051", "avg_fcp": "0.1508", "slow_fcp": "0.0441", "p75_fcp": "1600" }, { "month": "Jun 2023", "yyyymm": "202306", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6494", "avg_lcp": "0.1957", "slow_lcp": "0.155", "p75_lcp": "2900", "small_cls": "0.3548", "medium_cls": "0.1855", "large_cls": "0.4597", "p75_cls": "0.4", "fast_inp": "0.7639", "avg_inp": "0.1299", "slow_inp": "0.1063", "p75_inp": "175", "fast_ttfb": "0.4715", "avg_ttfb": "0.4718", "slow_ttfb": "0.0563", "p75_ttfb": "1000", "fast_fcp": "0.832", "avg_fcp": "0.123", "slow_fcp": "0.0447", "p75_fcp": "1500" }, { "month": "Jul 2023", "yyyymm": "202307", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6532", "avg_lcp": "0.1921", "slow_lcp": "0.1544", "p75_lcp": "3000", "small_cls": "0.4721", "medium_cls": "0.166", "large_cls": "0.3619", "p75_cls": "0.35", "fast_inp": "0.7864", "avg_inp": "0.124", "slow_inp": "0.0894", "p75_inp": "150", "fast_ttfb": "0.4235", "avg_ttfb": "0.4921", "slow_ttfb": "0.0845", "p75_ttfb": "1100", "fast_fcp": "0.7859", "avg_fcp": "0.1623", "slow_fcp": "0.0522", "p75_fcp": "1600" }, { "month": "Aug 2023", "yyyymm": "202308", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.607", "avg_lcp": "0.2318", "slow_lcp": "0.161", "p75_lcp": "3100", "small_cls": "0.433", "medium_cls": "0.1572", "large_cls": "0.4096", "p75_cls": "0.4", "fast_inp": "0.7424", "avg_inp": "0.1279", "slow_inp": "0.1293", "p75_inp": "200", "fast_ttfb": "0.3754", "avg_ttfb": "0.5235", "slow_ttfb": "0.1011", "p75_ttfb": "1200", "fast_fcp": "0.7657", "avg_fcp": "0.1715", "slow_fcp": "0.063", "p75_fcp": "1700" }, { "month": "Sep 2023", "yyyymm": "202309", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.65", "avg_lcp": "0.2093", "slow_lcp": "0.141", "p75_lcp": "2900", "small_cls": "0.4321", "medium_cls": "0.1498", "large_cls": "0.4181", "p75_cls": "0.4", "fast_inp": "0.6802", "avg_inp": "0.1629", "slow_inp": "0.1573", "p75_inp": "275", "fast_ttfb": "0.5074", "avg_ttfb": "0.4351", "slow_ttfb": "0.0571", "p75_ttfb": "1000", "fast_fcp": "0.8045", "avg_fcp": "0.1444", "slow_fcp": "0.051", "p75_fcp": "1600" }, { "month": "Oct 2023", "yyyymm": "202310", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6149", "avg_lcp": "0.2331", "slow_lcp": "0.1521", "p75_lcp": "3000", "small_cls": "0.5003", "medium_cls": "0.1679", "large_cls": "0.3319", "p75_cls": "0.3", "fast_inp": "0.6897", "avg_inp": "0.1534", "slow_inp": "0.1569", "p75_inp": "250", "fast_ttfb": "0.3541", "avg_ttfb": "0.5313", "slow_ttfb": "0.115", "p75_ttfb": "1300", "fast_fcp": "0.688", "avg_fcp": "0.2116", "slow_fcp": "0.1003", "p75_fcp": "1900" }, { "month": "Nov 2023", "yyyymm": "202311", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.4721", "avg_lcp": "0.3094", "slow_lcp": "0.2183", "p75_lcp": "3700", "small_cls": "0.5693", "medium_cls": "0.171", "large_cls": "0.2599", "p75_cls": "0.25", "fast_inp": "0.5841", "avg_inp": "0.2128", "slow_inp": "0.2028", "p75_inp": "375", "fast_ttfb": "0.2156", "avg_ttfb": "0.5449", "slow_ttfb": "0.24", "p75_ttfb": "1700", "fast_fcp": "0.4696", "avg_fcp": "0.3223", "slow_fcp": "0.208", "p75_fcp": "2700" }, { "month": "Dec 2023", "yyyymm": "202312", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.3626", "avg_lcp": "0.2923", "slow_lcp": "0.3454", "p75_lcp": "4800", "small_cls": "0.4475", "medium_cls": "0.3249", "large_cls": "0.228", "p75_cls": "0.2", "fast_inp": "0.6005", "avg_inp": "0.2068", "slow_inp": "0.1927", "p75_inp": "350", "fast_ttfb": "0.1465", "avg_ttfb": "0.5396", "slow_ttfb": "0.3139", "p75_ttfb": "1900", "fast_fcp": "0.3837", "avg_fcp": "0.3474", "slow_fcp": "0.269", "p75_fcp": "3100" }, { "month": "Jan 2024", "yyyymm": "202401", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6062", "avg_lcp": "0.2239", "slow_lcp": "0.1697", "p75_lcp": "3300", "small_cls": "0.4054", "medium_cls": "0.2887", "large_cls": "0.3061", "p75_cls": "0.3", "fast_inp": "0.7236", "avg_inp": "0.1537", "slow_inp": "0.1225", "p75_inp": "200", "fast_ttfb": "0.3838", "avg_ttfb": "0.5071", "slow_ttfb": "0.109", "p75_ttfb": "1200", "fast_fcp": "0.7278", "avg_fcp": "0.1792", "slow_fcp": "0.0934", "p75_fcp": "1800" }, { "month": "Feb 2024", "yyyymm": "202402", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5093", "avg_lcp": "0.2512", "slow_lcp": "0.2388", "p75_lcp": "3900", "small_cls": "0.4157", "medium_cls": "0.3384", "large_cls": "0.246", "p75_cls": "0.2", "fast_inp": "0.6958", "avg_inp": "0.1587", "slow_inp": "0.1461", "p75_inp": "225", "fast_ttfb": "0.2932", "avg_ttfb": "0.5028", "slow_ttfb": "0.2041", "p75_ttfb": "1600", "fast_fcp": "0.5695", "avg_fcp": "0.2562", "slow_fcp": "0.1749", "p75_fcp": "2500" }, { "month": "Mar 2024", "yyyymm": "202403", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5585", "avg_lcp": "0.2325", "slow_lcp": "0.209", "p75_lcp": "3600", "small_cls": "0.3634", "medium_cls": "0.3347", "large_cls": "0.3018", "p75_cls": "0.3", "fast_inp": "0.6778", "avg_inp": "0.1381", "slow_inp": "0.1837", "p75_inp": "275", "fast_ttfb": "0.3735", "avg_ttfb": "0.4812", "slow_ttfb": "0.1457", "p75_ttfb": "1300", "fast_fcp": "0.6514", "avg_fcp": "0.2246", "slow_fcp": "0.1238", "p75_fcp": "2100" }, { "month": "Apr 2024", "yyyymm": "202404", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6469", "avg_lcp": "0.2197", "slow_lcp": "0.1334", "p75_lcp": "2900", "small_cls": "0.4134", "medium_cls": "0.2868", "large_cls": "0.2998", "p75_cls": "0.3", "fast_inp": "0.8154", "avg_inp": "0.1143", "slow_inp": "0.07", "p75_inp": "125", "fast_ttfb": "0.4518", "avg_ttfb": "0.4755", "slow_ttfb": "0.0728", "p75_ttfb": "1100", "fast_fcp": "0.7998", "avg_fcp": "0.15", "slow_fcp": "0.0507", "p75_fcp": "1600" }, { "month": "May 2024", "yyyymm": "202405", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.4925", "avg_lcp": "0.2562", "slow_lcp": "0.2521", "p75_lcp": "4000", "small_cls": "0.4002", "medium_cls": "0.3367", "large_cls": "0.263", "p75_cls": "0.25", "fast_inp": "0.7428", "avg_inp": "0.1654", "slow_inp": "0.0915", "p75_inp": "200", "fast_ttfb": "0.3005", "avg_ttfb": "0.4875", "slow_ttfb": "0.2117", "p75_ttfb": "1600", "fast_fcp": "0.5636", "avg_fcp": "0.2688", "slow_fcp": "0.167", "p75_fcp": "2500" }, { "month": "Jun 2024", "yyyymm": "202406", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.3985", "avg_lcp": "0.2632", "slow_lcp": "0.3381", "p75_lcp": "4900", "small_cls": "0.3926", "medium_cls": "0.3648", "large_cls": "0.2428", "p75_cls": "0.2", "fast_inp": "0.6544", "avg_inp": "0.2116", "slow_inp": "0.1336", "p75_inp": "275", "fast_ttfb": "0.1994", "avg_ttfb": "0.5196", "slow_ttfb": "0.2809", "p75_ttfb": "1900", "fast_fcp": "0.4607", "avg_fcp": "0.3174", "slow_fcp": "0.2223", "p75_fcp": "2800" }, { "month": "Jul 2024", "yyyymm": "202407", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.4286", "avg_lcp": "0.2601", "slow_lcp": "0.3112", "p75_lcp": "4500", "small_cls": "0.4277", "medium_cls": "0.3808", "large_cls": "0.1917", "p75_cls": "0.15", "fast_inp": "0.691", "avg_inp": "0.1769", "slow_inp": "0.1321", "p75_inp": "225", "fast_ttfb": "0.2036", "avg_ttfb": "0.5419", "slow_ttfb": "0.2543", "p75_ttfb": "1800", "fast_fcp": "0.4986", "avg_fcp": "0.2962", "slow_fcp": "0.2059", "p75_fcp": "2700" }, { "month": "Aug 2024", "yyyymm": "202408", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.3758", "avg_lcp": "0.2921", "slow_lcp": "0.3319", "p75_lcp": "4700", "small_cls": "0.4348", "medium_cls": "0.395", "large_cls": "0.1703", "p75_cls": "0.15", "fast_inp": "0.6907", "avg_inp": "0.1741", "slow_inp": "0.1356", "p75_inp": "250", "fast_ttfb": "0.0627", "avg_ttfb": "0.6326", "slow_ttfb": "0.305", "p75_ttfb": "1900", "fast_fcp": "0.4148", "avg_fcp": "0.3526", "slow_fcp": "0.2323", "p75_fcp": "2900" }, { "month": "Sep 2024", "yyyymm": "202409", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.3469", "avg_lcp": "0.3073", "slow_lcp": "0.3461", "p75_lcp": "4800", "small_cls": "0.3435", "medium_cls": "0.2352", "large_cls": "0.4211", "p75_cls": "0.35", "fast_inp": "0.7127", "avg_inp": "0.1793", "slow_inp": "0.1082", "p75_inp": "225", "fast_ttfb": "0.0336", "avg_ttfb": "0.6874", "slow_ttfb": "0.2786", "p75_ttfb": "1800", "fast_fcp": "0.4262", "avg_fcp": "0.369", "slow_fcp": "0.2043", "p75_fcp": "2700" }, { "month": "Oct 2024", "yyyymm": "202410", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.5512", "avg_lcp": "0.239", "slow_lcp": "0.2096", "p75_lcp": "3600", "small_cls": "0.379", "medium_cls": "0.2828", "large_cls": "0.3381", "p75_cls": "0.3", "fast_inp": "0.7697", "avg_inp": "0.1607", "slow_inp": "0.0697", "p75_inp": "175", "fast_ttfb": "0.2202", "avg_ttfb": "0.7021", "slow_ttfb": "0.0777", "p75_ttfb": "1200", "fast_fcp": "0.7547", "avg_fcp": "0.2015", "slow_fcp": "0.0435", "p75_fcp": "1700" }, { "month": "Nov 2024", "yyyymm": "202411", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6009", "avg_lcp": "0.2443", "slow_lcp": "0.1549", "p75_lcp": "3200", "small_cls": "0.3702", "medium_cls": "0.3442", "large_cls": "0.2855", "p75_cls": "0.25", "fast_inp": "0.8516", "avg_inp": "0.1122", "slow_inp": "0.0368", "p75_inp": "125", "fast_ttfb": "0.479", "avg_ttfb": "0.4564", "slow_ttfb": "0.0648", "p75_ttfb": "1000", "fast_fcp": "0.8322", "avg_fcp": "0.1289", "slow_fcp": "0.0391", "p75_fcp": "1500" }, { "month": "Dec 2024", "yyyymm": "202412", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6473", "avg_lcp": "0.25", "slow_lcp": "0.1032", "p75_lcp": "2900", "small_cls": "0.4495", "medium_cls": "0.3462", "large_cls": "0.2044", "p75_cls": "0.2", "fast_inp": "0.8929", "avg_inp": "0.0769", "slow_inp": "0.0302", "p75_inp": "100", "fast_ttfb": "0.4843", "avg_ttfb": "0.4381", "slow_ttfb": "0.0783", "p75_ttfb": "1100", "fast_fcp": "0.8329", "avg_fcp": "0.1156", "slow_fcp": "0.051", "p75_fcp": "1500" }, { "month": "Jan 2025", "yyyymm": "202501", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.6228", "avg_lcp": "0.2262", "slow_lcp": "0.1513", "p75_lcp": "3000", "small_cls": "0.4804", "medium_cls": "0.2895", "large_cls": "0.2301", "p75_cls": "0.2", "fast_inp": "0.8626", "avg_inp": "0.0879", "slow_inp": "0.0494", "p75_inp": "125", "fast_ttfb": "0.4477", "avg_ttfb": "0.4868", "slow_ttfb": "0.0657", "p75_ttfb": "1100", "fast_fcp": "0.7866", "avg_fcp": "0.1519", "slow_fcp": "0.0616", "p75_fcp": "1600" }, { "month": "Feb 2025", "yyyymm": "202502", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.545", "avg_lcp": "0.296", "slow_lcp": "0.159", "p75_lcp": "3300", "small_cls": "0.4275", "medium_cls": "0.3188", "large_cls": "0.2536", "p75_cls": "0.25", "fast_inp": "0.8074", "avg_inp": "0.1216", "slow_inp": "0.071", "p75_inp": "150", "fast_ttfb": "0.3794", "avg_ttfb": "0.539", "slow_ttfb": "0.0821", "p75_ttfb": "1200", "fast_fcp": "0.7149", "avg_fcp": "0.2107", "slow_fcp": "0.074", "p75_fcp": "1900" }, { "month": "Mar 2025", "yyyymm": "202503", "origin": "https://www.bmwofcollegestation.com", "fast_lcp": "0.4684", "avg_lcp": "0.3002", "slow_lcp": "0.2312", "p75_lcp": "3800", "small_cls": "0.4983", "medium_cls": "0.2936", "large_cls": "0.2081", "p75_cls": "0.2", "fast_inp": "0.7779", "avg_inp": "0.1342", "slow_inp": "0.0876", "p75_inp": "175", "fast_ttfb": "0.192", "avg_ttfb": "0.6181", "slow_ttfb": "0.19", "p75_ttfb": "1500", "fast_fcp": "0.5427", "avg_fcp": "0.2907", "slow_fcp": "0.1666", "p75_fcp": "2400" }];
+          const https___www_bmwofcollegestation_comMonths = https___www_bmwofcollegestation_comData.map(item => item.month);
+
+          // AG script addition month from CSV data
+          const https___www_bmwofcollegestation_com_agScriptMonthIndex = -1;
+          const https___www_bmwofcollegestation_com_agScriptMonth = null;
+          const https___www_bmwofcollegestation_com_agScriptFullDate = null;
+
+          // Largest Contentful Paint (LCP) for https://www.bmwofcollegestation.com
+          (function () {
+            // Use origin-specific AG script month index
+            const agScriptMonthIndex = https___www_bmwofcollegestation_com_agScriptMonthIndex;
+            const agScriptMonth = https___www_bmwofcollegestation_com_agScriptMonth;
+            const agScriptFullDate = https___www_bmwofcollegestation_com_agScriptFullDate;
+            const agScriptLabel = agScriptFullDate ?
+              "AG script added: " + agScriptFullDate :
+              (agScriptMonth ? "AG script added: " + agScriptMonth : null);
+
+            // Only highlight if we have a valid AG script date
+            const shouldHighlight = index => agScriptMonthIndex !== -1 && index === agScriptMonthIndex;
+
+            // Distribution chart
+            const distCanvas = document.getElementById('https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__dist');
+            if (distCanvas) {
+              const distCtx = distCanvas.getContext('2d');
+
+              charts['https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__dist'] = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                  labels: https___www_bmwofcollegestation_comMonths.map((month, index) => shouldHighlight(index) ? '★ ' + month + ' ★' : month),
+                  datasets: [
+                    {
+                      label: 'Good',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['fast_lcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#4CAF50';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Good' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Good' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#4CAF50'
+                    },
+                    {
+                      label: 'Needs Improvement',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['avg_lcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#FF9800';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Needs Improvement' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Needs Improvement' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#FF9800'
+                    },
+                    {
+                      label: 'Poor',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['slow_lcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#F44336';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Poor' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Poor' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#F44336'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                  },
+                  scales: {
+                    x: {
+                      stacked: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        font: function (context) {
+                          if (shouldHighlight(context.index)) {
+                            return {
+                              weight: 'bold',
+                              color: '#FFFFFF'
+                            };
+                          }
+                          return {};
+                        }
+                      }
+                    },
+                    y: {
+                      stacked: true,
+                      beginAtZero: true,
+                      max: 1,
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        callback: function (value) {
+                          return (value * 100) + '%';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        boxWidth: 20,
+                        boxHeight: 20,
+                        color: function (context) {
+                          const label = context.text;
+                          if (label === 'Good') return '#66BB6A';
+                          if (label === 'Needs Improvement') return '#FFA726';
+                          if (label === 'Poor') return '#EF5350';
+                          return '#FFFFFF';
+                        }
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                      titleColor: '#FFFFFF',
+                      bodyColor: '#E0E0E0',
+                      borderColor: '#333333',
+                      borderWidth: 1,
+                      padding: 10,
+                      titleFont: {
+                        weight: 'bold',
+                        size: 14
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      callbacks: {
+                        title: function (context) {
+                          const index = context[0].dataIndex;
+                          if (shouldHighlight(index) && agScriptLabel) {
+                            return https___www_bmwofcollegestation_comMonths[index] + ' (' + agScriptLabel + ')';
+                          }
+                          return https___www_bmwofcollegestation_comMonths[index];
+                        },
+                        label: function (context) {
+                          const value = context.raw;
+                          return `${context.dataset.label}: ${(value * 100).toFixed(1)}%`;
+                        }
+                      }
+                    }
+                  }
+                },
+                plugins: [forceLegendColors]
+              });
+
+              // Add p75 values
+              const p75Container = document.getElementById('https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__dist_p75');
+              if (p75Container) {
+                p75Container.innerHTML = https___www_bmwofcollegestation_comData.map((item, index) => {
+                  const p75Value = item['p75_lcp'];
+                  if (p75Value) {
+                    if (shouldHighlight(index) && agScriptLabel) {
+                      return '<strong>' + item.month + ': p75 = ' + p75Value + (true ? 'ms' : '') + '</strong>';
+                    }
+                    return item.month + ': p75 = ' + p75Value + (true ? 'ms' : '');
+                  }
+                  return '';
+                }).filter(Boolean).join(' | ');
+              }
+            }
+
+            // Trend chart
+            const trendCanvas = document.getElementById('https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__trend');
+            if (trendCanvas) {
+              const trendCtx = trendCanvas.getContext('2d');
+
+              // Simplified data preparation
+              const chartData = [];
+              const validMonths = [];
+
+              // Process data safely
+              https___www_bmwofcollegestation_comData.forEach((item, index) => {
+                let value = null;
+                try {
+                  const rawValue = item['p75_lcp'];
+                  if (rawValue !== undefined && rawValue !== null) {
+                    if (typeof rawValue === 'string') {
+                      value = parseFloat(rawValue.replace(/[^0-9.]/g, ''));
+                    } else if (typeof rawValue === 'number') {
+                      value = rawValue;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing value:', e);
+                }
+
+                if (value !== null && !isNaN(value)) {
+                  chartData.push(value);
+                  validMonths.push(https___www_bmwofcollegestation_comMonths[index]);
+                }
+              });
+
+              // Only create chart if we have data
+              if (chartData.length > 0) {
+                // Calculate safe min/max
+                const min = Math.min(...chartData);
+                const max = Math.max(...chartData);
+                const range = max - min > 0 ? max - min : 20;
+
+                charts['https___www_bmwofcollegestation_com_Largest_Contentful_Paint__LCP__trend'] = new Chart(trendCtx, {
+                  type: 'line',
+                  data: {
+                    labels: validMonths,
+                    datasets: [{
+                      label: 'LCP 75th Percentile (ms)',
+                      data: chartData,
+                      borderColor: '#64B5F6',
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return 'rgba(100, 181, 246, 0.1)';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(100, 181, 246, 0.0)');
+                        gradient.addColorStop(0.5, 'rgba(100, 181, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(100, 181, 246, 0.4)');
+
+                        return gradient;
+                      },
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                      pointBackgroundColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointRadius: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? 8 : 5;
+                      }),
+                      pointBorderColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointBorderWidth: 2,
+                      pointHoverRadius: 8,
+                      pointHoverBorderWidth: 2
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 1500,
+                      easing: 'easeOutQuart'
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: false,
+                        suggestedMin: function () {
+                          return min > 0 ? Math.max(0, min * 0.4) : min * 1.6;
+                        }(),
+                        suggestedMax: function () {
+                          return max + (range * 0.6);
+                        }(),
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.08)'
+                        },
+                        title: {
+                          display: true,
+                          text: ['LCP 75th Percentile (ms)', '(lower is better)'],
+                          font: {
+                            size: 14,
+                            weight: 'normal'
+                          },
+                          color: '#BDBDBD'
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value) {
+                            return value + (true ? 'ms' : '');
+                          }
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value, index) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return '★ ' + validMonths[index] + ' ★';
+                            }
+                            return validMonths[index];
+                          },
+                          font: function (context) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[context.index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return {
+                                weight: 'bold',
+                                color: '#FFFFFF'
+                              };
+                            }
+                            return {};
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          color: '#64B5F6',
+                          font: {
+                            weight: '500',
+                            size: 13
+                          },
+                          usePointStyle: true,
+                          padding: 15,
+                          generateLabels: function (chart) {
+                            const datasets = chart.data.datasets;
+                            return [{
+                              text: datasets[0].label,
+                              fillStyle: '#64B5F6',
+                              strokeStyle: '#64B5F6',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0,
+                              datasetIndex: 0,
+                              fontColor: '#64B5F6'
+                            }];
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#E0E0E0',
+                        borderColor: '#333333',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: {
+                          weight: 'bold',
+                          size: 14
+                        },
+                        bodyFont: {
+                          size: 13
+                        },
+                        callbacks: {
+                          title: function (context) {
+                            const index = context[0].dataIndex;
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex && agScriptLabel) {
+                              return validMonths[index] + ' (' + agScriptLabel + ')';
+                            }
+                            return validMonths[index];
+                          },
+                          label: function (context) {
+                            const value = context.parsed.y;
+                            let label = 'LCP 75th Percentile (ms): ' + value + (true ? 'ms' : '');
+
+                            // Add performance indicator
+                            if (context.datasetIndex === 0) {
+                              // Compare to previous value if available
+                              const dataIndex = context.dataIndex;
+                              if (dataIndex > 0 && chartData[dataIndex - 1] !== undefined) {
+                                const prevValue = chartData[dataIndex - 1];
+                                const diff = value - prevValue;
+                                const percentChange = (diff / prevValue) * 100;
+
+                                if (diff < 0) {
+                                  label += ' (↓ ' + Math.abs(percentChange).toFixed(1) + '% better than previous)';
+                                } else if (diff > 0) {
+                                  label += ' (↑ ' + percentChange.toFixed(1) + '% worse than previous)';
+                                } else {
+                                  label += ' (unchanged from previous)';
+                                }
+                              }
+
+                              // Add general performance note
+                              label += '\n💡 Lower values indicate better performance';
+                            }
+
+                            return label;
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              } else {
+                // Display a message if no valid data
+                trendCanvas.parentNode.innerHTML = '<div style="text-align: center; padding: 20px;">No valid data available for this metric</div>';
+              }
+            }
+          })();
+
+          // Cumulative Layout Shift (CLS) for https://www.bmwofcollegestation.com
+          (function () {
+            // Use origin-specific AG script month index
+            const agScriptMonthIndex = https___www_bmwofcollegestation_com_agScriptMonthIndex;
+            const agScriptMonth = https___www_bmwofcollegestation_com_agScriptMonth;
+            const agScriptFullDate = https___www_bmwofcollegestation_com_agScriptFullDate;
+            const agScriptLabel = agScriptFullDate ?
+              "AG script added: " + agScriptFullDate :
+              (agScriptMonth ? "AG script added: " + agScriptMonth : null);
+
+            // Only highlight if we have a valid AG script date
+            const shouldHighlight = index => agScriptMonthIndex !== -1 && index === agScriptMonthIndex;
+
+            // Distribution chart
+            const distCanvas = document.getElementById('https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__dist');
+            if (distCanvas) {
+              const distCtx = distCanvas.getContext('2d');
+
+              charts['https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__dist'] = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                  labels: https___www_bmwofcollegestation_comMonths.map((month, index) => shouldHighlight(index) ? '★ ' + month + ' ★' : month),
+                  datasets: [
+                    {
+                      label: 'Good',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['small_cls']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#4CAF50';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Good' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Good' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#4CAF50'
+                    },
+                    {
+                      label: 'Needs Improvement',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['medium_cls']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#FF9800';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Needs Improvement' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Needs Improvement' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#FF9800'
+                    },
+                    {
+                      label: 'Poor',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['large_cls']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#F44336';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Poor' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Poor' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#F44336'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                  },
+                  scales: {
+                    x: {
+                      stacked: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        font: function (context) {
+                          if (shouldHighlight(context.index)) {
+                            return {
+                              weight: 'bold',
+                              color: '#FFFFFF'
+                            };
+                          }
+                          return {};
+                        }
+                      }
+                    },
+                    y: {
+                      stacked: true,
+                      beginAtZero: true,
+                      max: 1,
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        callback: function (value) {
+                          return (value * 100) + '%';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        boxWidth: 20,
+                        boxHeight: 20,
+                        color: function (context) {
+                          const label = context.text;
+                          if (label === 'Good') return '#66BB6A';
+                          if (label === 'Needs Improvement') return '#FFA726';
+                          if (label === 'Poor') return '#EF5350';
+                          return '#FFFFFF';
+                        }
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                      titleColor: '#FFFFFF',
+                      bodyColor: '#E0E0E0',
+                      borderColor: '#333333',
+                      borderWidth: 1,
+                      padding: 10,
+                      titleFont: {
+                        weight: 'bold',
+                        size: 14
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      callbacks: {
+                        title: function (context) {
+                          const index = context[0].dataIndex;
+                          if (shouldHighlight(index) && agScriptLabel) {
+                            return https___www_bmwofcollegestation_comMonths[index] + ' (' + agScriptLabel + ')';
+                          }
+                          return https___www_bmwofcollegestation_comMonths[index];
+                        },
+                        label: function (context) {
+                          const value = context.raw;
+                          return `${context.dataset.label}: ${(value * 100).toFixed(1)}%`;
+                        }
+                      }
+                    }
+                  }
+                },
+                plugins: [forceLegendColors]
+              });
+
+              // Add p75 values
+              const p75Container = document.getElementById('https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__dist_p75');
+              if (p75Container) {
+                p75Container.innerHTML = https___www_bmwofcollegestation_comData.map((item, index) => {
+                  const p75Value = item['p75_cls'];
+                  if (p75Value) {
+                    if (shouldHighlight(index) && agScriptLabel) {
+                      return '<strong>' + item.month + ': p75 = ' + p75Value + (false ? 'ms' : '') + '</strong>';
+                    }
+                    return item.month + ': p75 = ' + p75Value + (false ? 'ms' : '');
+                  }
+                  return '';
+                }).filter(Boolean).join(' | ');
+              }
+            }
+
+            // Trend chart
+            const trendCanvas = document.getElementById('https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__trend');
+            if (trendCanvas) {
+              const trendCtx = trendCanvas.getContext('2d');
+
+              // Simplified data preparation
+              const chartData = [];
+              const validMonths = [];
+
+              // Process data safely
+              https___www_bmwofcollegestation_comData.forEach((item, index) => {
+                let value = null;
+                try {
+                  const rawValue = item['p75_cls'];
+                  if (rawValue !== undefined && rawValue !== null) {
+                    if (typeof rawValue === 'string') {
+                      value = parseFloat(rawValue.replace(/[^0-9.]/g, ''));
+                    } else if (typeof rawValue === 'number') {
+                      value = rawValue;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing value:', e);
+                }
+
+                if (value !== null && !isNaN(value)) {
+                  chartData.push(value);
+                  validMonths.push(https___www_bmwofcollegestation_comMonths[index]);
+                }
+              });
+
+              // Only create chart if we have data
+              if (chartData.length > 0) {
+                // Calculate safe min/max
+                const min = Math.min(...chartData);
+                const max = Math.max(...chartData);
+                const range = max - min > 0 ? max - min : 20;
+
+                charts['https___www_bmwofcollegestation_com_Cumulative_Layout_Shift__CLS__trend'] = new Chart(trendCtx, {
+                  type: 'line',
+                  data: {
+                    labels: validMonths,
+                    datasets: [{
+                      label: 'CLS 75th Percentile',
+                      data: chartData,
+                      borderColor: '#64B5F6',
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return 'rgba(100, 181, 246, 0.1)';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(100, 181, 246, 0.0)');
+                        gradient.addColorStop(0.5, 'rgba(100, 181, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(100, 181, 246, 0.4)');
+
+                        return gradient;
+                      },
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                      pointBackgroundColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointRadius: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? 8 : 5;
+                      }),
+                      pointBorderColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointBorderWidth: 2,
+                      pointHoverRadius: 8,
+                      pointHoverBorderWidth: 2
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 1500,
+                      easing: 'easeOutQuart'
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: false,
+                        suggestedMin: function () {
+                          return min > 0 ? Math.max(0, min * 0.4) : min * 1.6;
+                        }(),
+                        suggestedMax: function () {
+                          return max + (range * 0.6);
+                        }(),
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.08)'
+                        },
+                        title: {
+                          display: true,
+                          text: ['CLS 75th Percentile', '(lower is better)'],
+                          font: {
+                            size: 14,
+                            weight: 'normal'
+                          },
+                          color: '#BDBDBD'
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value) {
+                            return value + (false ? 'ms' : '');
+                          }
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value, index) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return '★ ' + validMonths[index] + ' ★';
+                            }
+                            return validMonths[index];
+                          },
+                          font: function (context) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[context.index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return {
+                                weight: 'bold',
+                                color: '#FFFFFF'
+                              };
+                            }
+                            return {};
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          color: '#64B5F6',
+                          font: {
+                            weight: '500',
+                            size: 13
+                          },
+                          usePointStyle: true,
+                          padding: 15,
+                          generateLabels: function (chart) {
+                            const datasets = chart.data.datasets;
+                            return [{
+                              text: datasets[0].label,
+                              fillStyle: '#64B5F6',
+                              strokeStyle: '#64B5F6',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0,
+                              datasetIndex: 0,
+                              fontColor: '#64B5F6'
+                            }];
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#E0E0E0',
+                        borderColor: '#333333',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: {
+                          weight: 'bold',
+                          size: 14
+                        },
+                        bodyFont: {
+                          size: 13
+                        },
+                        callbacks: {
+                          title: function (context) {
+                            const index = context[0].dataIndex;
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex && agScriptLabel) {
+                              return validMonths[index] + ' (' + agScriptLabel + ')';
+                            }
+                            return validMonths[index];
+                          },
+                          label: function (context) {
+                            const value = context.parsed.y;
+                            let label = 'CLS 75th Percentile: ' + value + (false ? 'ms' : '');
+
+                            // Add performance indicator
+                            if (context.datasetIndex === 0) {
+                              // Compare to previous value if available
+                              const dataIndex = context.dataIndex;
+                              if (dataIndex > 0 && chartData[dataIndex - 1] !== undefined) {
+                                const prevValue = chartData[dataIndex - 1];
+                                const diff = value - prevValue;
+                                const percentChange = (diff / prevValue) * 100;
+
+                                if (diff < 0) {
+                                  label += ' (↓ ' + Math.abs(percentChange).toFixed(1) + '% better than previous)';
+                                } else if (diff > 0) {
+                                  label += ' (↑ ' + percentChange.toFixed(1) + '% worse than previous)';
+                                } else {
+                                  label += ' (unchanged from previous)';
+                                }
+                              }
+
+                              // Add general performance note
+                              label += '\n💡 Lower values indicate better performance';
+                            }
+
+                            return label;
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              } else {
+                // Display a message if no valid data
+                trendCanvas.parentNode.innerHTML = '<div style="text-align: center; padding: 20px;">No valid data available for this metric</div>';
+              }
+            }
+          })();
+
+          // Interaction to Next Paint (INP) for https://www.bmwofcollegestation.com
+          (function () {
+            // Use origin-specific AG script month index
+            const agScriptMonthIndex = https___www_bmwofcollegestation_com_agScriptMonthIndex;
+            const agScriptMonth = https___www_bmwofcollegestation_com_agScriptMonth;
+            const agScriptFullDate = https___www_bmwofcollegestation_com_agScriptFullDate;
+            const agScriptLabel = agScriptFullDate ?
+              "AG script added: " + agScriptFullDate :
+              (agScriptMonth ? "AG script added: " + agScriptMonth : null);
+
+            // Only highlight if we have a valid AG script date
+            const shouldHighlight = index => agScriptMonthIndex !== -1 && index === agScriptMonthIndex;
+
+            // Distribution chart
+            const distCanvas = document.getElementById('https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__dist');
+            if (distCanvas) {
+              const distCtx = distCanvas.getContext('2d');
+
+              charts['https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__dist'] = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                  labels: https___www_bmwofcollegestation_comMonths.map((month, index) => shouldHighlight(index) ? '★ ' + month + ' ★' : month),
+                  datasets: [
+                    {
+                      label: 'Good',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['fast_inp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#4CAF50';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Good' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Good' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#4CAF50'
+                    },
+                    {
+                      label: 'Needs Improvement',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['avg_inp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#FF9800';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Needs Improvement' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Needs Improvement' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#FF9800'
+                    },
+                    {
+                      label: 'Poor',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['slow_inp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#F44336';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Poor' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Poor' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#F44336'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                  },
+                  scales: {
+                    x: {
+                      stacked: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        font: function (context) {
+                          if (shouldHighlight(context.index)) {
+                            return {
+                              weight: 'bold',
+                              color: '#FFFFFF'
+                            };
+                          }
+                          return {};
+                        }
+                      }
+                    },
+                    y: {
+                      stacked: true,
+                      beginAtZero: true,
+                      max: 1,
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        callback: function (value) {
+                          return (value * 100) + '%';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        boxWidth: 20,
+                        boxHeight: 20,
+                        color: function (context) {
+                          const label = context.text;
+                          if (label === 'Good') return '#66BB6A';
+                          if (label === 'Needs Improvement') return '#FFA726';
+                          if (label === 'Poor') return '#EF5350';
+                          return '#FFFFFF';
+                        }
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                      titleColor: '#FFFFFF',
+                      bodyColor: '#E0E0E0',
+                      borderColor: '#333333',
+                      borderWidth: 1,
+                      padding: 10,
+                      titleFont: {
+                        weight: 'bold',
+                        size: 14
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      callbacks: {
+                        title: function (context) {
+                          const index = context[0].dataIndex;
+                          if (shouldHighlight(index) && agScriptLabel) {
+                            return https___www_bmwofcollegestation_comMonths[index] + ' (' + agScriptLabel + ')';
+                          }
+                          return https___www_bmwofcollegestation_comMonths[index];
+                        },
+                        label: function (context) {
+                          const value = context.raw;
+                          return `${context.dataset.label}: ${(value * 100).toFixed(1)}%`;
+                        }
+                      }
+                    }
+                  }
+                },
+                plugins: [forceLegendColors]
+              });
+
+              // Add p75 values
+              const p75Container = document.getElementById('https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__dist_p75');
+              if (p75Container) {
+                p75Container.innerHTML = https___www_bmwofcollegestation_comData.map((item, index) => {
+                  const p75Value = item['p75_inp'];
+                  if (p75Value) {
+                    if (shouldHighlight(index) && agScriptLabel) {
+                      return '<strong>' + item.month + ': p75 = ' + p75Value + (true ? 'ms' : '') + '</strong>';
+                    }
+                    return item.month + ': p75 = ' + p75Value + (true ? 'ms' : '');
+                  }
+                  return '';
+                }).filter(Boolean).join(' | ');
+              }
+            }
+
+            // Trend chart
+            const trendCanvas = document.getElementById('https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__trend');
+            if (trendCanvas) {
+              const trendCtx = trendCanvas.getContext('2d');
+
+              // Simplified data preparation
+              const chartData = [];
+              const validMonths = [];
+
+              // Process data safely
+              https___www_bmwofcollegestation_comData.forEach((item, index) => {
+                let value = null;
+                try {
+                  const rawValue = item['p75_inp'];
+                  if (rawValue !== undefined && rawValue !== null) {
+                    if (typeof rawValue === 'string') {
+                      value = parseFloat(rawValue.replace(/[^0-9.]/g, ''));
+                    } else if (typeof rawValue === 'number') {
+                      value = rawValue;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing value:', e);
+                }
+
+                if (value !== null && !isNaN(value)) {
+                  chartData.push(value);
+                  validMonths.push(https___www_bmwofcollegestation_comMonths[index]);
+                }
+              });
+
+              // Only create chart if we have data
+              if (chartData.length > 0) {
+                // Calculate safe min/max
+                const min = Math.min(...chartData);
+                const max = Math.max(...chartData);
+                const range = max - min > 0 ? max - min : 20;
+
+                charts['https___www_bmwofcollegestation_com_Interaction_to_Next_Paint__INP__trend'] = new Chart(trendCtx, {
+                  type: 'line',
+                  data: {
+                    labels: validMonths,
+                    datasets: [{
+                      label: 'INP 75th Percentile (ms)',
+                      data: chartData,
+                      borderColor: '#64B5F6',
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return 'rgba(100, 181, 246, 0.1)';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(100, 181, 246, 0.0)');
+                        gradient.addColorStop(0.5, 'rgba(100, 181, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(100, 181, 246, 0.4)');
+
+                        return gradient;
+                      },
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                      pointBackgroundColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointRadius: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? 8 : 5;
+                      }),
+                      pointBorderColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointBorderWidth: 2,
+                      pointHoverRadius: 8,
+                      pointHoverBorderWidth: 2
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 1500,
+                      easing: 'easeOutQuart'
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: false,
+                        suggestedMin: function () {
+                          return min > 0 ? Math.max(0, min * 0.4) : min * 1.6;
+                        }(),
+                        suggestedMax: function () {
+                          return max + (range * 0.6);
+                        }(),
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.08)'
+                        },
+                        title: {
+                          display: true,
+                          text: ['INP 75th Percentile (ms)', '(lower is better)'],
+                          font: {
+                            size: 14,
+                            weight: 'normal'
+                          },
+                          color: '#BDBDBD'
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value) {
+                            return value + (true ? 'ms' : '');
+                          }
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value, index) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return '★ ' + validMonths[index] + ' ★';
+                            }
+                            return validMonths[index];
+                          },
+                          font: function (context) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[context.index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return {
+                                weight: 'bold',
+                                color: '#FFFFFF'
+                              };
+                            }
+                            return {};
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          color: '#64B5F6',
+                          font: {
+                            weight: '500',
+                            size: 13
+                          },
+                          usePointStyle: true,
+                          padding: 15,
+                          generateLabels: function (chart) {
+                            const datasets = chart.data.datasets;
+                            return [{
+                              text: datasets[0].label,
+                              fillStyle: '#64B5F6',
+                              strokeStyle: '#64B5F6',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0,
+                              datasetIndex: 0,
+                              fontColor: '#64B5F6'
+                            }];
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#E0E0E0',
+                        borderColor: '#333333',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: {
+                          weight: 'bold',
+                          size: 14
+                        },
+                        bodyFont: {
+                          size: 13
+                        },
+                        callbacks: {
+                          title: function (context) {
+                            const index = context[0].dataIndex;
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex && agScriptLabel) {
+                              return validMonths[index] + ' (' + agScriptLabel + ')';
+                            }
+                            return validMonths[index];
+                          },
+                          label: function (context) {
+                            const value = context.parsed.y;
+                            let label = 'INP 75th Percentile (ms): ' + value + (true ? 'ms' : '');
+
+                            // Add performance indicator
+                            if (context.datasetIndex === 0) {
+                              // Compare to previous value if available
+                              const dataIndex = context.dataIndex;
+                              if (dataIndex > 0 && chartData[dataIndex - 1] !== undefined) {
+                                const prevValue = chartData[dataIndex - 1];
+                                const diff = value - prevValue;
+                                const percentChange = (diff / prevValue) * 100;
+
+                                if (diff < 0) {
+                                  label += ' (↓ ' + Math.abs(percentChange).toFixed(1) + '% better than previous)';
+                                } else if (diff > 0) {
+                                  label += ' (↑ ' + percentChange.toFixed(1) + '% worse than previous)';
+                                } else {
+                                  label += ' (unchanged from previous)';
+                                }
+                              }
+
+                              // Add general performance note
+                              label += '\n💡 Lower values indicate better performance';
+                            }
+
+                            return label;
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              } else {
+                // Display a message if no valid data
+                trendCanvas.parentNode.innerHTML = '<div style="text-align: center; padding: 20px;">No valid data available for this metric</div>';
+              }
+            }
+          })();
+
+          // Time to First Byte (TTFB) for https://www.bmwofcollegestation.com
+          (function () {
+            // Use origin-specific AG script month index
+            const agScriptMonthIndex = https___www_bmwofcollegestation_com_agScriptMonthIndex;
+            const agScriptMonth = https___www_bmwofcollegestation_com_agScriptMonth;
+            const agScriptFullDate = https___www_bmwofcollegestation_com_agScriptFullDate;
+            const agScriptLabel = agScriptFullDate ?
+              "AG script added: " + agScriptFullDate :
+              (agScriptMonth ? "AG script added: " + agScriptMonth : null);
+
+            // Only highlight if we have a valid AG script date
+            const shouldHighlight = index => agScriptMonthIndex !== -1 && index === agScriptMonthIndex;
+
+            // Distribution chart
+            const distCanvas = document.getElementById('https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__dist');
+            if (distCanvas) {
+              const distCtx = distCanvas.getContext('2d');
+
+              charts['https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__dist'] = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                  labels: https___www_bmwofcollegestation_comMonths.map((month, index) => shouldHighlight(index) ? '★ ' + month + ' ★' : month),
+                  datasets: [
+                    {
+                      label: 'Good',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['fast_ttfb']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#4CAF50';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Good' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Good' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#4CAF50'
+                    },
+                    {
+                      label: 'Needs Improvement',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['avg_ttfb']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#FF9800';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Needs Improvement' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Needs Improvement' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#FF9800'
+                    },
+                    {
+                      label: 'Poor',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['slow_ttfb']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#F44336';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Poor' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Poor' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#F44336'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                  },
+                  scales: {
+                    x: {
+                      stacked: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        font: function (context) {
+                          if (shouldHighlight(context.index)) {
+                            return {
+                              weight: 'bold',
+                              color: '#FFFFFF'
+                            };
+                          }
+                          return {};
+                        }
+                      }
+                    },
+                    y: {
+                      stacked: true,
+                      beginAtZero: true,
+                      max: 1,
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        callback: function (value) {
+                          return (value * 100) + '%';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        boxWidth: 20,
+                        boxHeight: 20,
+                        color: function (context) {
+                          const label = context.text;
+                          if (label === 'Good') return '#66BB6A';
+                          if (label === 'Needs Improvement') return '#FFA726';
+                          if (label === 'Poor') return '#EF5350';
+                          return '#FFFFFF';
+                        }
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                      titleColor: '#FFFFFF',
+                      bodyColor: '#E0E0E0',
+                      borderColor: '#333333',
+                      borderWidth: 1,
+                      padding: 10,
+                      titleFont: {
+                        weight: 'bold',
+                        size: 14
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      callbacks: {
+                        title: function (context) {
+                          const index = context[0].dataIndex;
+                          if (shouldHighlight(index) && agScriptLabel) {
+                            return https___www_bmwofcollegestation_comMonths[index] + ' (' + agScriptLabel + ')';
+                          }
+                          return https___www_bmwofcollegestation_comMonths[index];
+                        },
+                        label: function (context) {
+                          const value = context.raw;
+                          return `${context.dataset.label}: ${(value * 100).toFixed(1)}%`;
+                        }
+                      }
+                    }
+                  }
+                },
+                plugins: [forceLegendColors]
+              });
+
+              // Add p75 values
+              const p75Container = document.getElementById('https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__dist_p75');
+              if (p75Container) {
+                p75Container.innerHTML = https___www_bmwofcollegestation_comData.map((item, index) => {
+                  const p75Value = item['p75_ttfb'];
+                  if (p75Value) {
+                    if (shouldHighlight(index) && agScriptLabel) {
+                      return '<strong>' + item.month + ': p75 = ' + p75Value + (true ? 'ms' : '') + '</strong>';
+                    }
+                    return item.month + ': p75 = ' + p75Value + (true ? 'ms' : '');
+                  }
+                  return '';
+                }).filter(Boolean).join(' | ');
+              }
+            }
+
+            // Trend chart
+            const trendCanvas = document.getElementById('https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__trend');
+            if (trendCanvas) {
+              const trendCtx = trendCanvas.getContext('2d');
+
+              // Simplified data preparation
+              const chartData = [];
+              const validMonths = [];
+
+              // Process data safely
+              https___www_bmwofcollegestation_comData.forEach((item, index) => {
+                let value = null;
+                try {
+                  const rawValue = item['p75_ttfb'];
+                  if (rawValue !== undefined && rawValue !== null) {
+                    if (typeof rawValue === 'string') {
+                      value = parseFloat(rawValue.replace(/[^0-9.]/g, ''));
+                    } else if (typeof rawValue === 'number') {
+                      value = rawValue;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing value:', e);
+                }
+
+                if (value !== null && !isNaN(value)) {
+                  chartData.push(value);
+                  validMonths.push(https___www_bmwofcollegestation_comMonths[index]);
+                }
+              });
+
+              // Only create chart if we have data
+              if (chartData.length > 0) {
+                // Calculate safe min/max
+                const min = Math.min(...chartData);
+                const max = Math.max(...chartData);
+                const range = max - min > 0 ? max - min : 20;
+
+                charts['https___www_bmwofcollegestation_com_Time_to_First_Byte__TTFB__trend'] = new Chart(trendCtx, {
+                  type: 'line',
+                  data: {
+                    labels: validMonths,
+                    datasets: [{
+                      label: 'TTFB 75th Percentile (ms)',
+                      data: chartData,
+                      borderColor: '#64B5F6',
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return 'rgba(100, 181, 246, 0.1)';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(100, 181, 246, 0.0)');
+                        gradient.addColorStop(0.5, 'rgba(100, 181, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(100, 181, 246, 0.4)');
+
+                        return gradient;
+                      },
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                      pointBackgroundColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointRadius: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? 8 : 5;
+                      }),
+                      pointBorderColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointBorderWidth: 2,
+                      pointHoverRadius: 8,
+                      pointHoverBorderWidth: 2
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 1500,
+                      easing: 'easeOutQuart'
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: false,
+                        suggestedMin: function () {
+                          return min > 0 ? Math.max(0, min * 0.4) : min * 1.6;
+                        }(),
+                        suggestedMax: function () {
+                          return max + (range * 0.6);
+                        }(),
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.08)'
+                        },
+                        title: {
+                          display: true,
+                          text: ['TTFB 75th Percentile (ms)', '(lower is better)'],
+                          font: {
+                            size: 14,
+                            weight: 'normal'
+                          },
+                          color: '#BDBDBD'
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value) {
+                            return value + (true ? 'ms' : '');
+                          }
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value, index) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return '★ ' + validMonths[index] + ' ★';
+                            }
+                            return validMonths[index];
+                          },
+                          font: function (context) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[context.index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return {
+                                weight: 'bold',
+                                color: '#FFFFFF'
+                              };
+                            }
+                            return {};
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          color: '#64B5F6',
+                          font: {
+                            weight: '500',
+                            size: 13
+                          },
+                          usePointStyle: true,
+                          padding: 15,
+                          generateLabels: function (chart) {
+                            const datasets = chart.data.datasets;
+                            return [{
+                              text: datasets[0].label,
+                              fillStyle: '#64B5F6',
+                              strokeStyle: '#64B5F6',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0,
+                              datasetIndex: 0,
+                              fontColor: '#64B5F6'
+                            }];
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#E0E0E0',
+                        borderColor: '#333333',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: {
+                          weight: 'bold',
+                          size: 14
+                        },
+                        bodyFont: {
+                          size: 13
+                        },
+                        callbacks: {
+                          title: function (context) {
+                            const index = context[0].dataIndex;
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex && agScriptLabel) {
+                              return validMonths[index] + ' (' + agScriptLabel + ')';
+                            }
+                            return validMonths[index];
+                          },
+                          label: function (context) {
+                            const value = context.parsed.y;
+                            let label = 'TTFB 75th Percentile (ms): ' + value + (true ? 'ms' : '');
+
+                            // Add performance indicator
+                            if (context.datasetIndex === 0) {
+                              // Compare to previous value if available
+                              const dataIndex = context.dataIndex;
+                              if (dataIndex > 0 && chartData[dataIndex - 1] !== undefined) {
+                                const prevValue = chartData[dataIndex - 1];
+                                const diff = value - prevValue;
+                                const percentChange = (diff / prevValue) * 100;
+
+                                if (diff < 0) {
+                                  label += ' (↓ ' + Math.abs(percentChange).toFixed(1) + '% better than previous)';
+                                } else if (diff > 0) {
+                                  label += ' (↑ ' + percentChange.toFixed(1) + '% worse than previous)';
+                                } else {
+                                  label += ' (unchanged from previous)';
+                                }
+                              }
+
+                              // Add general performance note
+                              label += '\n💡 Lower values indicate better performance';
+                            }
+
+                            return label;
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              } else {
+                // Display a message if no valid data
+                trendCanvas.parentNode.innerHTML = '<div style="text-align: center; padding: 20px;">No valid data available for this metric</div>';
+              }
+            }
+          })();
+
+          // First Contentful Paint (FCP) for https://www.bmwofcollegestation.com
+          (function () {
+            // Use origin-specific AG script month index
+            const agScriptMonthIndex = https___www_bmwofcollegestation_com_agScriptMonthIndex;
+            const agScriptMonth = https___www_bmwofcollegestation_com_agScriptMonth;
+            const agScriptFullDate = https___www_bmwofcollegestation_com_agScriptFullDate;
+            const agScriptLabel = agScriptFullDate ?
+              "AG script added: " + agScriptFullDate :
+              (agScriptMonth ? "AG script added: " + agScriptMonth : null);
+
+            // Only highlight if we have a valid AG script date
+            const shouldHighlight = index => agScriptMonthIndex !== -1 && index === agScriptMonthIndex;
+
+            // Distribution chart
+            const distCanvas = document.getElementById('https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__dist');
+            if (distCanvas) {
+              const distCtx = distCanvas.getContext('2d');
+
+              charts['https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__dist'] = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                  labels: https___www_bmwofcollegestation_comMonths.map((month, index) => shouldHighlight(index) ? '★ ' + month + ' ★' : month),
+                  datasets: [
+                    {
+                      label: 'Good',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['fast_fcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#4CAF50';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Good' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Good' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#4CAF50'
+                    },
+                    {
+                      label: 'Needs Improvement',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['avg_fcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#FF9800';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Needs Improvement' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Needs Improvement' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#FF9800'
+                    },
+                    {
+                      label: 'Poor',
+                      data: https___www_bmwofcollegestation_comData.map(item => item['slow_fcp']),
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return '#F44336';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+                        // Set gradient colors based on the metric type
+                        if ('Poor' === 'Good') {
+                          gradient.addColorStop(0, 'rgba(102, 187, 106, 0.7)');
+                          gradient.addColorStop(1, 'rgba(102, 187, 106, 1)');
+                        } else if ('Poor' === 'Needs Improvement') {
+                          gradient.addColorStop(0, 'rgba(255, 167, 38, 0.7)');
+                          gradient.addColorStop(1, 'rgba(255, 167, 38, 1)');
+                        } else {
+                          gradient.addColorStop(0, 'rgba(239, 83, 80, 0.7)');
+                          gradient.addColorStop(1, 'rgba(239, 83, 80, 1)');
+                        }
+
+                        return gradient;
+                      },
+                      stack: 'Stack 0',
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: '#F44336'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeOutQuart'
+                  },
+                  scales: {
+                    x: {
+                      stacked: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        font: function (context) {
+                          if (shouldHighlight(context.index)) {
+                            return {
+                              weight: 'bold',
+                              color: '#FFFFFF'
+                            };
+                          }
+                          return {};
+                        }
+                      }
+                    },
+                    y: {
+                      stacked: true,
+                      beginAtZero: true,
+                      max: 1,
+                      grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                      },
+                      ticks: {
+                        color: 'rgba(224, 224, 224, 0.8)',
+                        callback: function (value) {
+                          return (value * 100) + '%';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        boxWidth: 20,
+                        boxHeight: 20,
+                        color: function (context) {
+                          const label = context.text;
+                          if (label === 'Good') return '#66BB6A';
+                          if (label === 'Needs Improvement') return '#FFA726';
+                          if (label === 'Poor') return '#EF5350';
+                          return '#FFFFFF';
+                        }
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                      titleColor: '#FFFFFF',
+                      bodyColor: '#E0E0E0',
+                      borderColor: '#333333',
+                      borderWidth: 1,
+                      padding: 10,
+                      titleFont: {
+                        weight: 'bold',
+                        size: 14
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      callbacks: {
+                        title: function (context) {
+                          const index = context[0].dataIndex;
+                          if (shouldHighlight(index) && agScriptLabel) {
+                            return https___www_bmwofcollegestation_comMonths[index] + ' (' + agScriptLabel + ')';
+                          }
+                          return https___www_bmwofcollegestation_comMonths[index];
+                        },
+                        label: function (context) {
+                          const value = context.raw;
+                          return `${context.dataset.label}: ${(value * 100).toFixed(1)}%`;
+                        }
+                      }
+                    }
+                  }
+                },
+                plugins: [forceLegendColors]
+              });
+
+              // Add p75 values
+              const p75Container = document.getElementById('https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__dist_p75');
+              if (p75Container) {
+                p75Container.innerHTML = https___www_bmwofcollegestation_comData.map((item, index) => {
+                  const p75Value = item['p75_fcp'];
+                  if (p75Value) {
+                    if (shouldHighlight(index) && agScriptLabel) {
+                      return '<strong>' + item.month + ': p75 = ' + p75Value + (true ? 'ms' : '') + '</strong>';
+                    }
+                    return item.month + ': p75 = ' + p75Value + (true ? 'ms' : '');
+                  }
+                  return '';
+                }).filter(Boolean).join(' | ');
+              }
+            }
+
+            // Trend chart
+            const trendCanvas = document.getElementById('https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__trend');
+            if (trendCanvas) {
+              const trendCtx = trendCanvas.getContext('2d');
+
+              // Simplified data preparation
+              const chartData = [];
+              const validMonths = [];
+
+              // Process data safely
+              https___www_bmwofcollegestation_comData.forEach((item, index) => {
+                let value = null;
+                try {
+                  const rawValue = item['p75_fcp'];
+                  if (rawValue !== undefined && rawValue !== null) {
+                    if (typeof rawValue === 'string') {
+                      value = parseFloat(rawValue.replace(/[^0-9.]/g, ''));
+                    } else if (typeof rawValue === 'number') {
+                      value = rawValue;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing value:', e);
+                }
+
+                if (value !== null && !isNaN(value)) {
+                  chartData.push(value);
+                  validMonths.push(https___www_bmwofcollegestation_comMonths[index]);
+                }
+              });
+
+              // Only create chart if we have data
+              if (chartData.length > 0) {
+                // Calculate safe min/max
+                const min = Math.min(...chartData);
+                const max = Math.max(...chartData);
+                const range = max - min > 0 ? max - min : 20;
+
+                charts['https___www_bmwofcollegestation_com_First_Contentful_Paint__FCP__trend'] = new Chart(trendCtx, {
+                  type: 'line',
+                  data: {
+                    labels: validMonths,
+                    datasets: [{
+                      label: 'FCP 75th Percentile (ms)',
+                      data: chartData,
+                      borderColor: '#64B5F6',
+                      backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+
+                        if (!chartArea) {
+                          // This case happens on initial chart load
+                          return 'rgba(100, 181, 246, 0.1)';
+                        }
+
+                        // Create gradient
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(100, 181, 246, 0.0)');
+                        gradient.addColorStop(0.5, 'rgba(100, 181, 246, 0.2)');
+                        gradient.addColorStop(1, 'rgba(100, 181, 246, 0.4)');
+
+                        return gradient;
+                      },
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                      pointBackgroundColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointRadius: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? 8 : 5;
+                      }),
+                      pointBorderColor: validMonths.map((_, i) => {
+                        const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[i]);
+                        return originalIndex === agScriptMonthIndex ? '#FF7043' : '#64B5F6';
+                      }),
+                      pointBorderWidth: 2,
+                      pointHoverRadius: 8,
+                      pointHoverBorderWidth: 2
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 1500,
+                      easing: 'easeOutQuart'
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: false,
+                        suggestedMin: function () {
+                          return min > 0 ? Math.max(0, min * 0.4) : min * 1.6;
+                        }(),
+                        suggestedMax: function () {
+                          return max + (range * 0.6);
+                        }(),
+                        grid: {
+                          color: 'rgba(255, 255, 255, 0.08)'
+                        },
+                        title: {
+                          display: true,
+                          text: ['FCP 75th Percentile (ms)', '(lower is better)'],
+                          font: {
+                            size: 14,
+                            weight: 'normal'
+                          },
+                          color: '#BDBDBD'
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value) {
+                            return value + (true ? 'ms' : '');
+                          }
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: 'rgba(224, 224, 224, 0.8)',
+                          callback: function (value, index) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return '★ ' + validMonths[index] + ' ★';
+                            }
+                            return validMonths[index];
+                          },
+                          font: function (context) {
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[context.index]);
+                            if (originalIndex === agScriptMonthIndex) {
+                              return {
+                                weight: 'bold',
+                                color: '#FFFFFF'
+                              };
+                            }
+                            return {};
+                          }
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          color: '#64B5F6',
+                          font: {
+                            weight: '500',
+                            size: 13
+                          },
+                          usePointStyle: true,
+                          padding: 15,
+                          generateLabels: function (chart) {
+                            const datasets = chart.data.datasets;
+                            return [{
+                              text: datasets[0].label,
+                              fillStyle: '#64B5F6',
+                              strokeStyle: '#64B5F6',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0,
+                              datasetIndex: 0,
+                              fontColor: '#64B5F6'
+                            }];
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#E0E0E0',
+                        borderColor: '#333333',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: {
+                          weight: 'bold',
+                          size: 14
+                        },
+                        bodyFont: {
+                          size: 13
+                        },
+                        callbacks: {
+                          title: function (context) {
+                            const index = context[0].dataIndex;
+                            const originalIndex = https___www_bmwofcollegestation_comMonths.indexOf(validMonths[index]);
+                            if (originalIndex === agScriptMonthIndex && agScriptLabel) {
+                              return validMonths[index] + ' (' + agScriptLabel + ')';
+                            }
+                            return validMonths[index];
+                          },
+                          label: function (context) {
+                            const value = context.parsed.y;
+                            let label = 'FCP 75th Percentile (ms): ' + value + (true ? 'ms' : '');
+
+                            // Add performance indicator
+                            if (context.datasetIndex === 0) {
+                              // Compare to previous value if available
+                              const dataIndex = context.dataIndex;
+                              if (dataIndex > 0 && chartData[dataIndex - 1] !== undefined) {
+                                const prevValue = chartData[dataIndex - 1];
+                                const diff = value - prevValue;
+                                const percentChange = (diff / prevValue) * 100;
+
+                                if (diff < 0) {
+                                  label += ' (↓ ' + Math.abs(percentChange).toFixed(1) + '% better than previous)';
+                                } else if (diff > 0) {
+                                  label += ' (↑ ' + percentChange.toFixed(1) + '% worse than previous)';
+                                } else {
+                                  label += ' (unchanged from previous)';
+                                }
+                              }
+
+                              // Add general performance note
+                              label += '\n💡 Lower values indicate better performance';
+                            }
+
+                            return label;
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              } else {
+                // Display a message if no valid data
+                trendCanvas.parentNode.innerHTML = '<div style="text-align: center; padding: 20px;">No valid data available for this metric</div>';
+              }
+            }
+          })();
+
+        } catch (error) {
+          console.error('Error creating charts:', error);
+          // Display a user-friendly error message
+          document.querySelector('.main-content').innerHTML += '<div style="color: red; padding: 20px; background: #ffeeee; border: 1px solid #ffcccc; margin-top: 20px;">Error creating charts. Please check the console for details.</div>';
+        }
+      }
+
+      // Create all charts on load
+      createAllCharts();
+
+      // Smooth scrolling for navigation links
+      document.querySelectorAll('.sidebar a').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          e.preventDefault();
+          const targetId = this.getAttribute('href');
+          const targetElement = document.querySelector(targetId);
+
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth'
+            });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+
+</html>
